@@ -14,15 +14,26 @@ import NotificationsPage from "./pages/tags/NotificationsPage";
 // ============================================================
 export default function App() {
   const [authView, setAuthView] = useState("login"); // "login" | "signup"
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null); // Cognito ID token
-  const [accessToken, setAccessToken] = useState(null); // Cognito Access token
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem("ecolens_user");
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [token, setToken] = useState(() =>
+    localStorage.getItem("ecolens_id_token")
+  ); // Cognito ID token
+  const [accessToken, setAccessToken] = useState(() =>
+    localStorage.getItem("ecolens_access_token")
+  ); // Cognito Access token
   const [activePage, setActivePage] = useState("upload");
 
   function handleLogin({ token, accessToken, user }) {
     setToken(token);
     setAccessToken(accessToken);
     setUser(user);
+
+    localStorage.setItem("ecolens_id_token", token);
+    localStorage.setItem("ecolens_access_token", accessToken);
+    localStorage.setItem("ecolens_user", JSON.stringify(user));
   }
 
   async function handleLogout() {
@@ -31,6 +42,10 @@ export default function App() {
     setToken(null);
     setAccessToken(null);
     setActivePage("upload");
+
+    localStorage.removeItem("ecolens_id_token");
+    localStorage.removeItem("ecolens_access_token");
+    localStorage.removeItem("ecolens_user");
   }
 
   const pages = [
