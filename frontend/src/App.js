@@ -1,97 +1,25 @@
 import { useState, useRef, useEffect } from "react";
-
-// ============================================================
-// AWS COGNITO CONFIG — Provided by Member 1 (Kalana)
-// ============================================================
-const COGNITO_CONFIG = {
-  region: "us-east-1",
-  userPoolId: "us-east-1_FB2bm3xBs",
-  clientId: "8cc8uqaupjpe5hl005ktue5gr",
-};
-
-const COGNITO_URL = `https://cognito-idp.${COGNITO_CONFIG.region}.amazonaws.com/`;
-
-// ============================================================
-// MOCK API LAYER — Member 2 (Kiran) replaces the non-auth
-// functions below with real AWS API Gateway endpoint calls
-// ============================================================
-const API_BASE = "https://YOUR_API_GATEWAY_URL"; // TODO: Kiran replaces this
-
-const mockDelay = (ms = 800) => new Promise(r => setTimeout(r, ms));
-
-// Helper: call Cognito API
-async function cognitoRequest(action, body) {
-  const res = await fetch(COGNITO_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-amz-json-1.1",
-      "X-Amz-Target": `AWSCognitoIdentityProviderService.${action}`,
-    },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || data.__type || "Cognito error");
-  return data;
-}
+import { API_BASE, mockDelay } from "./config";
+import {
+  login,
+  signup,
+  logout,
+  confirmSignUp,
+  resendConfirmationCode,
+} from "./repository/auth";
 
 const api = {
-  // ✅ REAL Cognito login
-  async login(email, password) {
-    const data = await cognitoRequest("InitiateAuth", {
-      AuthFlow: "USER_PASSWORD_AUTH",
-      ClientId: COGNITO_CONFIG.clientId,
-      AuthParameters: { USERNAME: email, PASSWORD: password },
-    });
-    const token = data.AuthenticationResult.IdToken;
-    const accessToken = data.AuthenticationResult.AccessToken;
-    // Decode first name/last name from ID token payload
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return {
-      token,
-      accessToken,
-      user: {
-        email: payload.email || email,
-        firstName: payload.given_name || email.split("@")[0],
-        lastName: payload.family_name || "",
-      },
-    };
-  },
-
-  // ✅ REAL Cognito sign-up
-  async signup(email, password, firstName, lastName) {
-    await cognitoRequest("SignUp", {
-      ClientId: COGNITO_CONFIG.clientId,
-      Username: email,
-      Password: password,
-      UserAttributes: [
-        { Name: "email", Value: email },
-        { Name: "given_name", Value: firstName },
-        { Name: "family_name", Value: lastName },
-      ],
-    });
-    return { success: true, message: "Account created! Please check your email to verify your account before signing in." };
-  },
-
-  // ✅ REAL Cognito sign-out (revokes tokens)
-  async logout(accessToken) {
-    if (accessToken) {
-      try {
-        await cognitoRequest("GlobalSignOut", { AccessToken: accessToken });
-      } catch (e) { /* ignore */ }
-    }
-    return { success: true };
-  },
-
   // FILE UPLOAD — Member 2 replaces
   async uploadFile(file, token) {
     await mockDelay(1500);
     const isDuplicate = file.name.includes("dup");
-    if (isDuplicate) throw new Error("DUPLICATE: This file already exists in the system.");
+    if (isDuplicate)
+      throw new Error("DUPLICATE: This file already exists in the system.");
     return {
       fileUrl: `https://s3.amazonaws.com/ecolens/uploads/${file.name}`,
       thumbnailUrl: `https://s3.amazonaws.com/ecolens/thumbnails/thumb_${file.name}`,
       tags: ["koala", "eucalyptus"],
-      message: "File uploaded and tagged successfully!"
+      message: "File uploaded and tagged successfully!",
     };
   },
 
@@ -100,24 +28,47 @@ const api = {
     // tagsObj e.g. { koala: 3, wombat: 1 }
     await mockDelay();
     return [
-      { fileUrl: "https://via.placeholder.com/400x300?text=Koala+Photo", thumbnailUrl: "https://via.placeholder.com/150?text=Koala", tags: ["koala", "eucalyptus"], type: "image" },
-      { fileUrl: "https://via.placeholder.com/400x300?text=Wombat+Video", thumbnailUrl: null, tags: ["wombat"], type: "video" },
+      {
+        fileUrl: "https://via.placeholder.com/400x300?text=Koala+Photo",
+        thumbnailUrl: "https://via.placeholder.com/150?text=Koala",
+        tags: ["koala", "eucalyptus"],
+        type: "image",
+      },
+      {
+        fileUrl: "https://via.placeholder.com/400x300?text=Wombat+Video",
+        thumbnailUrl: null,
+        tags: ["wombat"],
+        type: "video",
+      },
     ];
   },
   async queryBySpecies(species, token) {
     await mockDelay();
     return [
-      { fileUrl: "https://via.placeholder.com/400x300?text=Species+Result", thumbnailUrl: "https://via.placeholder.com/150?text=Result", tags: [species], type: "image" },
+      {
+        fileUrl: "https://via.placeholder.com/400x300?text=Species+Result",
+        thumbnailUrl: "https://via.placeholder.com/150?text=Result",
+        tags: [species],
+        type: "image",
+      },
     ];
   },
   async queryByThumbnailUrl(thumbUrl, token) {
     await mockDelay();
-    return { fileUrl: "https://via.placeholder.com/800x600?text=Full+Image", tags: ["dingo", "sand"] };
+    return {
+      fileUrl: "https://via.placeholder.com/800x600?text=Full+Image",
+      tags: ["dingo", "sand"],
+    };
   },
   async queryByFile(file, token) {
     await mockDelay(1200);
     return [
-      { fileUrl: "https://via.placeholder.com/400x300?text=Similar+File", thumbnailUrl: "https://via.placeholder.com/150?text=Similar", tags: ["cassowary"], type: "image" },
+      {
+        fileUrl: "https://via.placeholder.com/400x300?text=Similar+File",
+        thumbnailUrl: "https://via.placeholder.com/150?text=Similar",
+        tags: ["cassowary"],
+        type: "image",
+      },
     ];
   },
 
@@ -125,19 +76,28 @@ const api = {
   async modifyTags(urls, tags, operation, token) {
     // operation: 1 = add, 0 = remove
     await mockDelay();
-    return { success: true, message: `Tags ${operation === 1 ? "added" : "removed"} successfully on ${urls.length} file(s).` };
+    return {
+      success: true,
+      message: `Tags ${operation === 1 ? "added" : "removed"} successfully on ${urls.length} file(s).`,
+    };
   },
 
   // DELETE — Member 2 replaces
   async deleteFiles(urls, token) {
     await mockDelay();
-    return { success: true, message: `${urls.length} file(s) deleted successfully.` };
+    return {
+      success: true,
+      message: `${urls.length} file(s) deleted successfully.`,
+    };
   },
 
   // NOTIFICATIONS — Member 1 replaces (SNS)
   async subscribeNotification(email, tag, token) {
     await mockDelay();
-    return { success: true, message: `Subscribed to notifications for "${tag}"` };
+    return {
+      success: true,
+      message: `Subscribed to notifications for "${tag}"`,
+    };
   },
 };
 
@@ -424,10 +384,17 @@ const styles = `
 // ============================================================
 function Alert({ type = "info", children }) {
   const icons = { success: "✓", error: "✕", info: "ℹ" };
-  return <div className={`alert alert-${type}`}><span>{icons[type]}</span><span>{children}</span></div>;
+  return (
+    <div className={`alert alert-${type}`}>
+      <span>{icons[type]}</span>
+      <span>{children}</span>
+    </div>
+  );
 }
 
-function Spinner() { return <span className="spinner" />; }
+function Spinner() {
+  return <span className="spinner" />;
+}
 
 function Tag({ label, variant = "green" }) {
   return <span className={`tag tag-${variant}`}>{label}</span>;
@@ -439,43 +406,80 @@ function Tag({ label, variant = "green" }) {
 function LoginPage({ onLogin, onSwitchToSignup }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
     try {
-      const result = await api.login(email, password);
+      const result = await login(email, password);
       onLogin(result);
     } catch (err) {
       setError(err.message);
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div className="auth-wrapper">
       <div className="auth-card">
         <div className="auth-logo">
-          <h1>Aussie <span>EcoLens</span></h1>
+          <h1>
+            Aussie <span>EcoLens</span>
+          </h1>
           <p>Wildlife Observation Platform</p>
         </div>
         {error && <Alert type="error">{error}</Alert>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label className="form-label">Email</label>
-            <input className="form-input" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
+            <input
+              className="form-input"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
           </div>
           <div className="form-group">
             <label className="form-label">Password</label>
-            <input className="form-input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+            <div
+              style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}
+            >
+              <input
+                className="form-input"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setShowPassword((value) => !value)}
+                style={{ whiteSpace: "nowrap" }}
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
           </div>
-          <button className="btn btn-primary" style={{ width: "100%" }} disabled={loading}>
+          <button
+            className="btn btn-primary"
+            style={{ width: "100%" }}
+            disabled={loading}
+          >
             {loading ? <Spinner /> : "Sign In"}
           </button>
         </form>
         <div className="auth-switch">
-          Don't have an account? <button onClick={onSwitchToSignup}>Sign up</button>
+          Don't have an account?{" "}
+          <button onClick={onSwitchToSignup}>Sign up</button>
         </div>
       </div>
     </div>
@@ -483,58 +487,184 @@ function LoginPage({ onLogin, onSwitchToSignup }) {
 }
 
 function SignupPage({ onSignup, onSwitchToLogin }) {
-  const [form, setForm] = useState({ email: "", password: "", firstName: "", lastName: "" });
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+    firstName: "",
+    lastName: "",
+  });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
-  const update = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  const [verificationStep, setVerificationStep] = useState(false);
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+
+  const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setLoading(true); setError(""); setMsg(null);
+    setLoading(true);
+    setError("");
+    setMsg(null);
     try {
-      const result = await api.signup(form.email, form.password, form.firstName, form.lastName);
-      setMsg(result.message);
+      const result = await signup(
+        form.email,
+        form.password,
+        form.firstName,
+        form.lastName,
+      );
+      setMsg(result.message || "Verification code sent to your email.");
+      setVerificationStep(true);
     } catch (err) {
       setError(err.message);
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleConfirm() {
+    setVerifying(true);
+    setError("");
+    try {
+      await confirmSignUp(form.email, code);
+      setMsg("Account verified — you can now sign in.");
+      setVerificationStep(false);
+      onSwitchToLogin();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  async function handleResend() {
+    setResendLoading(true);
+    setError("");
+    try {
+      const res = await resendConfirmationCode(form.email);
+      setMsg(res.message || "Verification code resent.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setResendLoading(false);
+    }
   }
 
   return (
     <div className="auth-wrapper">
       <div className="auth-card">
         <div className="auth-logo">
-          <h1>Aussie <span>EcoLens</span></h1>
+          <h1>
+            Aussie <span>EcoLens</span>
+          </h1>
           <p>Create your account</p>
         </div>
         {error && <Alert type="error">{error}</Alert>}
         {msg && <Alert type="success">{msg}</Alert>}
-        <form onSubmit={handleSubmit}>
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">First Name</label>
-              <input className="form-input" placeholder="Jane" value={form.firstName} onChange={update("firstName")} required />
+
+        {!verificationStep ? (
+          <form onSubmit={handleSubmit}>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">First Name</label>
+                <input
+                  className="form-input"
+                  placeholder="Jane"
+                  value={form.firstName}
+                  onChange={update("firstName")}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Last Name</label>
+                <input
+                  className="form-input"
+                  placeholder="Smith"
+                  value={form.lastName}
+                  onChange={update("lastName")}
+                  required
+                />
+              </div>
             </div>
             <div className="form-group">
-              <label className="form-label">Last Name</label>
-              <input className="form-input" placeholder="Smith" value={form.lastName} onChange={update("lastName")} required />
+              <label className="form-label">Email</label>
+              <input
+                className="form-input"
+                type="email"
+                placeholder="you@example.com"
+                value={form.email}
+                onChange={update("email")}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Password</label>
+              <div
+                style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}
+              >
+                <input
+                  className="form-input"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Min. 8 characters"
+                  value={form.password}
+                  onChange={update("password")}
+                  required
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setShowPassword((value) => !value)}
+                  style={{ whiteSpace: "nowrap" }}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
+            <button
+              className="btn btn-primary"
+              style={{ width: "100%" }}
+              disabled={loading}
+            >
+              {loading ? <Spinner /> : "Create Account"}
+            </button>
+          </form>
+        ) : (
+          <div>
+            <div className="form-group">
+              <label className="form-label">Verification Code</label>
+              <input
+                className="form-input"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="Enter code"
+              />
+            </div>
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleConfirm}
+                disabled={verifying}
+              >
+                {verifying ? <Spinner /> : "Verify Account"}
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={handleResend}
+                disabled={resendLoading}
+              >
+                {resendLoading ? <Spinner /> : "Resend Code"}
+              </button>
             </div>
           </div>
-          <div className="form-group">
-            <label className="form-label">Email</label>
-            <input className="form-input" type="email" placeholder="you@example.com" value={form.email} onChange={update("email")} required />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Password</label>
-            <input className="form-input" type="password" placeholder="Min. 8 characters" value={form.password} onChange={update("password")} required />
-          </div>
-          <button className="btn btn-primary" style={{ width: "100%" }} disabled={loading}>
-            {loading ? <Spinner /> : "Create Account"}
-          </button>
-        </form>
-        <div className="auth-switch">
-          Already have an account? <button onClick={onSwitchToLogin}>Sign in</button>
+        )}
+
+        <div className="auth-switch" style={{ marginTop: "1rem" }}>
+          Already have an account?{" "}
+          <button onClick={onSwitchToLogin}>Sign in</button>
         </div>
       </div>
     </div>
@@ -554,19 +684,28 @@ function UploadPage({ token }) {
   const inputRef = useRef();
 
   function handleFile(f) {
-    setFile(f); setResult(null); setError("");
+    setFile(f);
+    setResult(null);
+    setError("");
   }
 
   function onDrop(e) {
-    e.preventDefault(); setDrag(false);
+    e.preventDefault();
+    setDrag(false);
     const f = e.dataTransfer.files[0];
     if (f) handleFile(f);
   }
 
   async function handleUpload() {
     if (!file) return;
-    setLoading(true); setError(""); setResult(null); setProgress(0);
-    const interval = setInterval(() => setProgress(p => Math.min(p + 15, 85)), 200);
+    setLoading(true);
+    setError("");
+    setResult(null);
+    setProgress(0);
+    const interval = setInterval(
+      () => setProgress((p) => Math.min(p + 15, 85)),
+      200,
+    );
     try {
       const res = await api.uploadFile(file, token);
       setProgress(100);
@@ -582,54 +721,145 @@ function UploadPage({ token }) {
   return (
     <div>
       <div className="page-header">
-        <h1>Upload <span>Wildlife Media</span></h1>
-        <p>Images and videos are automatically tagged using our ML species detection model</p>
+        <h1>
+          Upload <span>Wildlife Media</span>
+        </h1>
+        <p>
+          Images and videos are automatically tagged using our ML species
+          detection model
+        </p>
       </div>
       <div className="card">
         <div className="card-title">🌿 Select File</div>
         <div
           className={`dropzone${drag ? " drag-over" : ""}`}
           onClick={() => inputRef.current.click()}
-          onDragOver={e => { e.preventDefault(); setDrag(true); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDrag(true);
+          }}
           onDragLeave={() => setDrag(false)}
           onDrop={onDrop}
         >
           <div className="dropzone-icon">📁</div>
           <div className="dropzone-text">
-            {file ? <><strong>{file.name}</strong><br /><span style={{ fontSize: "0.8rem", color: "var(--mist)" }}>{(file.size / 1024).toFixed(1)} KB</span></> : <><strong>Click or drag</strong> to select a file<br />Supports JPG, PNG, MP4, MOV</>}
+            {file ? (
+              <>
+                <strong>{file.name}</strong>
+                <br />
+                <span style={{ fontSize: "0.8rem", color: "var(--mist)" }}>
+                  {(file.size / 1024).toFixed(1)} KB
+                </span>
+              </>
+            ) : (
+              <>
+                <strong>Click or drag</strong> to select a file
+                <br />
+                Supports JPG, PNG, MP4, MOV
+              </>
+            )}
           </div>
-          <input ref={inputRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*,video/*"
+            style={{ display: "none" }}
+            onChange={(e) => handleFile(e.target.files[0])}
+          />
         </div>
 
         {file && (
           <>
             {loading && (
               <div className="progress-bar-wrap">
-                <div className="progress-bar" style={{ width: `${progress}%` }} />
+                <div
+                  className="progress-bar"
+                  style={{ width: `${progress}%` }}
+                />
               </div>
             )}
             <div style={{ marginTop: "1rem", display: "flex", gap: "0.75rem" }}>
-              <button className="btn btn-primary" onClick={handleUpload} disabled={loading}>
-                {loading ? <><Spinner /> Uploading...</> : "🚀 Upload & Tag"}
+              <button
+                className="btn btn-primary"
+                onClick={handleUpload}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Spinner /> Uploading...
+                  </>
+                ) : (
+                  "🚀 Upload & Tag"
+                )}
               </button>
-              <button className="btn btn-secondary" onClick={() => { setFile(null); setResult(null); setError(""); }}>Clear</button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  setFile(null);
+                  setResult(null);
+                  setError("");
+                }}
+              >
+                Clear
+              </button>
             </div>
           </>
         )}
 
-        {error && <div style={{ marginTop: "1rem" }}><Alert type="error">{error}</Alert></div>}
+        {error && (
+          <div style={{ marginTop: "1rem" }}>
+            <Alert type="error">{error}</Alert>
+          </div>
+        )}
 
         {result && (
           <div style={{ marginTop: "1.5rem" }}>
             <Alert type="success">{result.message}</Alert>
             <div className="card" style={{ marginTop: "1rem" }}>
               <div className="card-title">✅ Upload Result</div>
-              <p style={{ fontSize: "0.85rem", color: "var(--mist)", marginBottom: "0.5rem" }}>File URL: <a href={result.fileUrl} style={{ color: "var(--sage)" }}>{result.fileUrl}</a></p>
-              {result.thumbnailUrl && <p style={{ fontSize: "0.85rem", color: "var(--mist)", marginBottom: "0.75rem" }}>Thumbnail: <a href={result.thumbnailUrl} style={{ color: "var(--sage)" }}>{result.thumbnailUrl}</a></p>}
+              <p
+                style={{
+                  fontSize: "0.85rem",
+                  color: "var(--mist)",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                File URL:{" "}
+                <a href={result.fileUrl} style={{ color: "var(--sage)" }}>
+                  {result.fileUrl}
+                </a>
+              </p>
+              {result.thumbnailUrl && (
+                <p
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "var(--mist)",
+                    marginBottom: "0.75rem",
+                  }}
+                >
+                  Thumbnail:{" "}
+                  <a
+                    href={result.thumbnailUrl}
+                    style={{ color: "var(--sage)" }}
+                  >
+                    {result.thumbnailUrl}
+                  </a>
+                </p>
+              )}
               <div>
-                <span style={{ fontSize: "0.82rem", color: "var(--mist)", marginRight: "0.5rem" }}>Detected species:</span>
+                <span
+                  style={{
+                    fontSize: "0.82rem",
+                    color: "var(--mist)",
+                    marginRight: "0.5rem",
+                  }}
+                >
+                  Detected species:
+                </span>
                 <div className="tags-row">
-                  {result.tags.map(t => <Tag key={t} label={t} />)}
+                  {result.tags.map((t) => (
+                    <Tag key={t} label={t} />
+                  ))}
                 </div>
               </div>
             </div>
@@ -659,12 +889,16 @@ function QueryPage({ token }) {
   const fileRef = useRef();
 
   async function runQuery() {
-    setLoading(true); setError(""); setResults([]);
+    setLoading(true);
+    setError("");
+    setResults([]);
     try {
       let res;
       if (activeQuery === "tags") {
         const obj = {};
-        tagRows.forEach(r => { if (r.tag) obj[r.tag] = parseInt(r.count) || 1; });
+        tagRows.forEach((r) => {
+          if (r.tag) obj[r.tag] = parseInt(r.count) || 1;
+        });
         res = await api.queryByTags(obj, token);
       } else if (activeQuery === "species") {
         res = await api.queryBySpecies(species, token);
@@ -675,8 +909,11 @@ function QueryPage({ token }) {
         res = await api.queryByFile(queryFile, token);
       }
       setResults(res || []);
-    } catch (err) { setError(err.message); }
-    finally { setLoading(false); }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const queryTypes = [
@@ -689,14 +926,33 @@ function QueryPage({ token }) {
   return (
     <div>
       <div className="page-header">
-        <h1>Search <span>Wildlife Files</span></h1>
-        <p>Query your uploaded media using tags, species, URLs, or file content</p>
+        <h1>
+          Search <span>Wildlife Files</span>
+        </h1>
+        <p>
+          Query your uploaded media using tags, species, URLs, or file content
+        </p>
       </div>
 
       <div className="card">
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1.5rem" }}>
-          {queryTypes.map(q => (
-            <button key={q.id} className={`btn ${activeQuery === q.id ? "btn-primary" : "btn-secondary"} btn-sm`} onClick={() => { setActiveQuery(q.id); setResults([]); setError(""); }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            flexWrap: "wrap",
+            marginBottom: "1.5rem",
+          }}
+        >
+          {queryTypes.map((q) => (
+            <button
+              key={q.id}
+              className={`btn ${activeQuery === q.id ? "btn-primary" : "btn-secondary"} btn-sm`}
+              onClick={() => {
+                setActiveQuery(q.id);
+                setResults([]);
+                setError("");
+              }}
+            >
               {q.label}
             </button>
           ))}
@@ -707,62 +963,180 @@ function QueryPage({ token }) {
             <div className="card-title">Search by tags with minimum counts</div>
             {tagRows.map((row, i) => (
               <div key={i} className="tag-input-row">
-                <input className="form-input" placeholder="Species tag (e.g. koala)" value={row.tag} onChange={e => setTagRows(rows => rows.map((r, j) => j === i ? { ...r, tag: e.target.value } : r))} />
-                <input className="form-input" type="number" min="1" placeholder="Min count" style={{ maxWidth: "110px" }} value={row.count} onChange={e => setTagRows(rows => rows.map((r, j) => j === i ? { ...r, count: e.target.value } : r))} />
-                {tagRows.length > 1 && <button className="btn btn-danger btn-sm" onClick={() => setTagRows(rows => rows.filter((_, j) => j !== i))}>✕</button>}
+                <input
+                  className="form-input"
+                  placeholder="Species tag (e.g. koala)"
+                  value={row.tag}
+                  onChange={(e) =>
+                    setTagRows((rows) =>
+                      rows.map((r, j) =>
+                        j === i ? { ...r, tag: e.target.value } : r,
+                      ),
+                    )
+                  }
+                />
+                <input
+                  className="form-input"
+                  type="number"
+                  min="1"
+                  placeholder="Min count"
+                  style={{ maxWidth: "110px" }}
+                  value={row.count}
+                  onChange={(e) =>
+                    setTagRows((rows) =>
+                      rows.map((r, j) =>
+                        j === i ? { ...r, count: e.target.value } : r,
+                      ),
+                    )
+                  }
+                />
+                {tagRows.length > 1 && (
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={() =>
+                      setTagRows((rows) => rows.filter((_, j) => j !== i))
+                    }
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             ))}
-            <button className="btn btn-secondary btn-sm" onClick={() => setTagRows(r => [...r, { tag: "", count: 1 }])}>+ Add tag</button>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => setTagRows((r) => [...r, { tag: "", count: 1 }])}
+            >
+              + Add tag
+            </button>
           </div>
         )}
 
         {activeQuery === "species" && (
           <div className="form-group">
             <label className="form-label">Species name</label>
-            <input className="form-input" placeholder="e.g. dingo, cassowary, koala" value={species} onChange={e => setSpecies(e.target.value)} />
+            <input
+              className="form-input"
+              placeholder="e.g. dingo, cassowary, koala"
+              value={species}
+              onChange={(e) => setSpecies(e.target.value)}
+            />
           </div>
         )}
 
         {activeQuery === "thumbnail" && (
           <div className="form-group">
             <label className="form-label">Thumbnail URL</label>
-            <input className="form-input" placeholder="https://s3.amazonaws.com/..." value={thumbUrl} onChange={e => setThumbUrl(e.target.value)} />
+            <input
+              className="form-input"
+              placeholder="https://s3.amazonaws.com/..."
+              value={thumbUrl}
+              onChange={(e) => setThumbUrl(e.target.value)}
+            />
           </div>
         )}
 
         {activeQuery === "file" && (
           <div>
-            <div className="dropzone" onClick={() => fileRef.current.click()} style={{ padding: "1.5rem" }}>
+            <div
+              className="dropzone"
+              onClick={() => fileRef.current.click()}
+              style={{ padding: "1.5rem" }}
+            >
               <div className="dropzone-text">
-                {queryFile ? <strong>{queryFile.name}</strong> : <><strong>Click to select</strong> a file to match against</>}
+                {queryFile ? (
+                  <strong>{queryFile.name}</strong>
+                ) : (
+                  <>
+                    <strong>Click to select</strong> a file to match against
+                  </>
+                )}
               </div>
-              <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => setQueryFile(e.target.files[0])} />
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*,video/*"
+                style={{ display: "none" }}
+                onChange={(e) => setQueryFile(e.target.files[0])}
+              />
             </div>
-            <p style={{ fontSize: "0.8rem", color: "var(--mist)", marginTop: "0.5rem" }}>ℹ This file will NOT be stored in the database.</p>
+            <p
+              style={{
+                fontSize: "0.8rem",
+                color: "var(--mist)",
+                marginTop: "0.5rem",
+              }}
+            >
+              ℹ This file will NOT be stored in the database.
+            </p>
           </div>
         )}
 
         <div style={{ marginTop: "1.25rem" }}>
-          <button className="btn btn-primary" onClick={runQuery} disabled={loading}>
-            {loading ? <><Spinner /> Searching...</> : "🔍 Search"}
+          <button
+            className="btn btn-primary"
+            onClick={runQuery}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Spinner /> Searching...
+              </>
+            ) : (
+              "🔍 Search"
+            )}
           </button>
         </div>
       </div>
 
-      {error && <div style={{ marginTop: "1rem" }}><Alert type="error">{error}</Alert></div>}
+      {error && (
+        <div style={{ marginTop: "1rem" }}>
+          <Alert type="error">{error}</Alert>
+        </div>
+      )}
 
       {results.length > 0 && (
         <div className="card" style={{ marginTop: "1.5rem" }}>
-          <div className="card-title">🗂 Results <span style={{ fontSize: "0.8rem", color: "var(--mist)", fontFamily: "DM Sans" }}>({results.length} found)</span></div>
+          <div className="card-title">
+            🗂 Results{" "}
+            <span
+              style={{
+                fontSize: "0.8rem",
+                color: "var(--mist)",
+                fontFamily: "DM Sans",
+              }}
+            >
+              ({results.length} found)
+            </span>
+          </div>
           <div className="results-grid">
             {results.map((r, i) => (
               <div key={i} className="result-card" onClick={() => setModal(r)}>
-                {r.thumbnailUrl
-                  ? <img src={r.thumbnailUrl} alt="result" onError={e => e.target.style.display = "none"} />
-                  : <div style={{ height: "110px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2rem" }}>🎬</div>}
+                {r.thumbnailUrl ? (
+                  <img
+                    src={r.thumbnailUrl}
+                    alt="result"
+                    onError={(e) => (e.target.style.display = "none")}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      height: "110px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "2rem",
+                    }}
+                  >
+                    🎬
+                  </div>
+                )}
                 <div className="result-card-info">
                   <div className="result-card-type">{r.type || "image"}</div>
-                  <div className="tags-row">{(r.tags || []).slice(0, 2).map(t => <Tag key={t} label={t} />)}</div>
+                  <div className="tags-row">
+                    {(r.tags || []).slice(0, 2).map((t) => (
+                      <Tag key={t} label={t} />
+                    ))}
+                  </div>
                 </div>
               </div>
             ))}
@@ -771,17 +1145,42 @@ function QueryPage({ token }) {
       )}
 
       {results.length === 0 && !loading && !error && (
-        <div className="empty-state"><div className="icon">🔭</div><p>Run a query to see results</p></div>
+        <div className="empty-state">
+          <div className="icon">🔭</div>
+          <p>Run a query to see results</p>
+        </div>
       )}
 
       {modal && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setModal(null)}>✕</button>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setModal(null)}>
+              ✕
+            </button>
             <div className="card-title">Full Image</div>
-            <img src={modal.fileUrl} alt="full size" onError={e => e.target.src = "https://via.placeholder.com/400x300?text=Image+Unavailable"} />
-            <div className="tags-row">{(modal.tags || []).map(t => <Tag key={t} label={t} />)}</div>
-            <p style={{ fontSize: "0.8rem", color: "var(--mist)", marginTop: "0.75rem", wordBreak: "break-all" }}>{modal.fileUrl}</p>
+            <img
+              src={modal.fileUrl}
+              alt="full size"
+              onError={(e) =>
+                (e.target.src =
+                  "https://via.placeholder.com/400x300?text=Image+Unavailable")
+              }
+            />
+            <div className="tags-row">
+              {(modal.tags || []).map((t) => (
+                <Tag key={t} label={t} />
+              ))}
+            </div>
+            <p
+              style={{
+                fontSize: "0.8rem",
+                color: "var(--mist)",
+                marginTop: "0.75rem",
+                wordBreak: "break-all",
+              }}
+            >
+              {modal.fileUrl}
+            </p>
           </div>
         </div>
       )}
@@ -801,42 +1200,88 @@ function TagsPage({ token }) {
   const [error, setError] = useState("");
 
   async function handleSubmit() {
-    const urlList = urls.split("\n").map(u => u.trim()).filter(Boolean);
-    const tagList = tags.split(",").map(t => t.trim()).filter(Boolean);
-    if (!urlList.length || !tagList.length) { setError("Please provide at least one URL and one tag."); return; }
-    setLoading(true); setError(""); setMsg(null);
+    const urlList = urls
+      .split("\n")
+      .map((u) => u.trim())
+      .filter(Boolean);
+    const tagList = tags
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (!urlList.length || !tagList.length) {
+      setError("Please provide at least one URL and one tag.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setMsg(null);
     try {
       const res = await api.modifyTags(urlList, tagList, operation, token);
       setMsg(res.message);
-    } catch (err) { setError(err.message); }
-    finally { setLoading(false); }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div>
       <div className="page-header">
-        <h1>Manage <span>Tags</span></h1>
+        <h1>
+          Manage <span>Tags</span>
+        </h1>
         <p>Bulk add or remove species tags from your uploaded files</p>
       </div>
       <div className="card">
         <div className="form-group">
           <label className="form-label">File URLs (one per line)</label>
-          <textarea className="form-input" rows={4} placeholder={"https://s3.amazonaws.com/ecolens/file1.jpg\nhttps://s3.amazonaws.com/ecolens/file2.jpg"} value={urls} onChange={e => setUrls(e.target.value)} style={{ resize: "vertical" }} />
+          <textarea
+            className="form-input"
+            rows={4}
+            placeholder={
+              "https://s3.amazonaws.com/ecolens/file1.jpg\nhttps://s3.amazonaws.com/ecolens/file2.jpg"
+            }
+            value={urls}
+            onChange={(e) => setUrls(e.target.value)}
+            style={{ resize: "vertical" }}
+          />
         </div>
         <div className="form-group">
           <label className="form-label">Tags (comma separated)</label>
-          <input className="form-input" placeholder="koala, wombat, magpie" value={tags} onChange={e => setTags(e.target.value)} />
+          <input
+            className="form-input"
+            placeholder="koala, wombat, magpie"
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+          />
         </div>
         <div className="form-group">
           <label className="form-label">Operation</label>
-          <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.25rem" }}>
-            <button className={`btn btn-sm ${operation === 1 ? "btn-primary" : "btn-secondary"}`} onClick={() => setOperation(1)}>➕ Add Tags</button>
-            <button className={`btn btn-sm ${operation === 0 ? "btn-danger" : "btn-secondary"}`} onClick={() => setOperation(0)}>➖ Remove Tags</button>
+          <div
+            style={{ display: "flex", gap: "0.75rem", marginTop: "0.25rem" }}
+          >
+            <button
+              className={`btn btn-sm ${operation === 1 ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => setOperation(1)}
+            >
+              ➕ Add Tags
+            </button>
+            <button
+              className={`btn btn-sm ${operation === 0 ? "btn-danger" : "btn-secondary"}`}
+              onClick={() => setOperation(0)}
+            >
+              ➖ Remove Tags
+            </button>
           </div>
         </div>
         {error && <Alert type="error">{error}</Alert>}
         {msg && <Alert type="success">{msg}</Alert>}
-        <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
+        <button
+          className="btn btn-primary"
+          onClick={handleSubmit}
+          disabled={loading}
+        >
           {loading ? <Spinner /> : `${operation === 1 ? "Add" : "Remove"} Tags`}
         </button>
       </div>
@@ -854,32 +1299,66 @@ function DeletePage({ token }) {
   const [error, setError] = useState("");
 
   async function handleDelete() {
-    const urlList = urls.split("\n").map(u => u.trim()).filter(Boolean);
-    if (!urlList.length) { setError("Please enter at least one URL."); return; }
-    setLoading(true); setError(""); setMsg(null);
+    const urlList = urls
+      .split("\n")
+      .map((u) => u.trim())
+      .filter(Boolean);
+    if (!urlList.length) {
+      setError("Please enter at least one URL.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setMsg(null);
     try {
       const res = await api.deleteFiles(urlList, token);
       setMsg(res.message);
       setUrls("");
-    } catch (err) { setError(err.message); }
-    finally { setLoading(false); }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div>
       <div className="page-header">
-        <h1>Delete <span>Files</span></h1>
-        <p>Permanently remove files and their thumbnails from storage and the database</p>
+        <h1>
+          Delete <span>Files</span>
+        </h1>
+        <p>
+          Permanently remove files and their thumbnails from storage and the
+          database
+        </p>
       </div>
       <div className="card">
-        <Alert type="info">⚠ This action is irreversible. Files and thumbnails will be permanently deleted.</Alert>
+        <Alert type="info">
+          ⚠ This action is irreversible. Files and thumbnails will be
+          permanently deleted.
+        </Alert>
         <div className="form-group">
-          <label className="form-label">File URLs to delete (one per line)</label>
-          <textarea className="form-input" rows={5} placeholder={"https://s3.amazonaws.com/ecolens/file1.jpg\nhttps://s3.amazonaws.com/ecolens/file2.jpg"} value={urls} onChange={e => setUrls(e.target.value)} style={{ resize: "vertical" }} />
+          <label className="form-label">
+            File URLs to delete (one per line)
+          </label>
+          <textarea
+            className="form-input"
+            rows={5}
+            placeholder={
+              "https://s3.amazonaws.com/ecolens/file1.jpg\nhttps://s3.amazonaws.com/ecolens/file2.jpg"
+            }
+            value={urls}
+            onChange={(e) => setUrls(e.target.value)}
+            style={{ resize: "vertical" }}
+          />
         </div>
         {error && <Alert type="error">{error}</Alert>}
         {msg && <Alert type="success">{msg}</Alert>}
-        <button className="btn btn-danger" onClick={handleDelete} disabled={loading}>
+        <button
+          className="btn btn-danger"
+          onClick={handleDelete}
+          disabled={loading}
+        >
           {loading ? <Spinner /> : "🗑 Delete Files"}
         </button>
       </div>
@@ -898,34 +1377,62 @@ function NotificationsPage({ token, user }) {
   const [error, setError] = useState("");
 
   async function handleSubscribe() {
-    if (!email || !tag) { setError("Please enter both email and tag."); return; }
-    setLoading(true); setError(""); setMsg(null);
+    if (!email || !tag) {
+      setError("Please enter both email and tag.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setMsg(null);
     try {
       const res = await api.subscribeNotification(email, tag, token);
       setMsg(res.message);
       setTag("");
-    } catch (err) { setError(err.message); }
-    finally { setLoading(false); }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div>
       <div className="page-header">
-        <h1>Tag <span>Notifications</span></h1>
-        <p>Subscribe to email alerts when new files with specific species are uploaded</p>
+        <h1>
+          Tag <span>Notifications</span>
+        </h1>
+        <p>
+          Subscribe to email alerts when new files with specific species are
+          uploaded
+        </p>
       </div>
       <div className="card">
         <div className="form-group">
           <label className="form-label">Email Address</label>
-          <input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
+          <input
+            className="form-input"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+          />
         </div>
         <div className="form-group">
           <label className="form-label">Species Tag to Watch</label>
-          <input className="form-input" placeholder="e.g. koala, wombat, dingo" value={tag} onChange={e => setTag(e.target.value)} />
+          <input
+            className="form-input"
+            placeholder="e.g. koala, wombat, dingo"
+            value={tag}
+            onChange={(e) => setTag(e.target.value)}
+          />
         </div>
         {error && <Alert type="error">{error}</Alert>}
         {msg && <Alert type="success">{msg}</Alert>}
-        <button className="btn btn-primary" onClick={handleSubscribe} disabled={loading}>
+        <button
+          className="btn btn-primary"
+          onClick={handleSubscribe}
+          disabled={loading}
+        >
           {loading ? <Spinner /> : "🔔 Subscribe"}
         </button>
       </div>
@@ -950,7 +1457,7 @@ export default function App() {
   }
 
   async function handleLogout() {
-    await api.logout(accessToken);
+    await logout(accessToken);
     setUser(null);
     setToken(null);
     setAccessToken(null);
@@ -972,9 +1479,17 @@ export default function App() {
         <style>{styles}</style>
         <div className="bg-pattern" />
         <div className="app">
-          {authView === "login"
-            ? <LoginPage onLogin={handleLogin} onSwitchToSignup={() => setAuthView("signup")} />
-            : <SignupPage onSignup={() => setAuthView("login")} onSwitchToLogin={() => setAuthView("login")} />}
+          {authView === "login" ? (
+            <LoginPage
+              onLogin={handleLogin}
+              onSwitchToSignup={() => setAuthView("signup")}
+            />
+          ) : (
+            <SignupPage
+              onSignup={() => setAuthView("login")}
+              onSwitchToLogin={() => setAuthView("login")}
+            />
+          )}
         </div>
       </>
     );
@@ -986,17 +1501,27 @@ export default function App() {
       <div className="bg-pattern" />
       <div className="app">
         <nav className="nav">
-          <div className="nav-brand">🌿 Aussie <span>EcoLens</span></div>
+          <div className="nav-brand">
+            🌿 Aussie <span>EcoLens</span>
+          </div>
           <div className="nav-tabs">
-            {pages.map(p => (
-              <button key={p.id} className={`nav-tab${activePage === p.id ? " active" : ""}`} onClick={() => setActivePage(p.id)}>
+            {pages.map((p) => (
+              <button
+                key={p.id}
+                className={`nav-tab${activePage === p.id ? " active" : ""}`}
+                onClick={() => setActivePage(p.id)}
+              >
                 {p.icon} {p.label}
               </button>
             ))}
           </div>
           <div className="nav-user">
-            <span>{user.firstName} {user.lastName}</span>
-            <button className="btn-logout" onClick={handleLogout}>Sign Out</button>
+            <span>
+              {user.firstName} {user.lastName}
+            </span>
+            <button className="btn-logout" onClick={handleLogout}>
+              Sign Out
+            </button>
           </div>
         </nav>
         <main className="main">
@@ -1004,7 +1529,9 @@ export default function App() {
           {activePage === "query" && <QueryPage token={token} />}
           {activePage === "tags" && <TagsPage token={token} />}
           {activePage === "delete" && <DeletePage token={token} />}
-          {activePage === "notifications" && <NotificationsPage token={token} user={user} />}
+          {activePage === "notifications" && (
+            <NotificationsPage token={token} user={user} />
+          )}
         </main>
       </div>
     </>
