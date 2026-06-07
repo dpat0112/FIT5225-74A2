@@ -8,6 +8,8 @@ import QueryPage from "./pages/query/QueryPage";
 import TagsPage from "./pages/tags/TagsPage";
 import DeletePage from "./pages/tags/DeletePage";
 import NotificationsPage from "./pages/tags/NotificationsPage";
+import { useEffect, useCallback } from "react";
+import { getAvailableTags } from "./repository/mediaApi";
 
 // ============================================================
 // MAIN APP
@@ -45,6 +47,27 @@ export default function App() {
   const [thumbUrl, setThumbUrl] = useState("");
   const [queryFile, setQueryFile] = useState(null);
   const [detectedTags, setDetectedTags] = useState(null);
+  const [availableTags, setAvailableTags] = useState([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
+
+  const loadTags = useCallback(async (authToken) => {
+    if (!authToken) return;
+    setTagsLoading(true);
+    try {
+      const tags = await getAvailableTags(authToken);
+      setAvailableTags(tags);
+    } catch (e) {
+      console.error("Failed to load tags:", e);
+    } finally {
+      setTagsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (token) {
+      loadTags(token);
+    }
+  }, [token, loadTags]);
 
   function handleLogin({ token, accessToken, user }) {
     setToken(token);
@@ -153,6 +176,9 @@ export default function App() {
               setQueryFile={setQueryFile}
               detectedTags={detectedTags}
               setDetectedTags={setDetectedTags}
+              availableTags={availableTags}
+              tagsLoading={tagsLoading}
+              onRefreshTags={() => loadTags(token)}
             />
           )}
           {activePage === "tags" && <TagsPage token={token} />}

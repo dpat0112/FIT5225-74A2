@@ -25,6 +25,9 @@ export default function QueryPage({
   setQueryFile,
   detectedTags,
   setDetectedTags,
+  availableTags,
+  tagsLoading,
+  onRefreshTags,
 }) {
   const [loading, setLoading] = useState(false);
   const [modal, setModal] = useState(null);
@@ -114,12 +117,23 @@ export default function QueryPage({
 
         {activeQueryTab === "tags" && (
           <div>
-            <div className="card-title">Search by tags with minimum counts</div>
+            <div className="card-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>Search by tags with minimum counts</span>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={onRefreshTags}
+                disabled={tagsLoading}
+                style={{ fontSize: "0.7rem", padding: "0.2rem 0.5rem" }}
+              >
+                {tagsLoading ? <Spinner /> : "🔄 Refresh Tags"}
+              </button>
+            </div>
             {tagRows.map((row, i) => (
               <div key={i} className="tag-input-row">
                 <input
                   className="form-input"
                   placeholder="Species tag (e.g. koala)"
+                  list="available-tags"
                   value={row.tag}
                   onChange={(e) =>
                     setTagRows((rows) =>
@@ -167,15 +181,32 @@ export default function QueryPage({
 
         {activeQueryTab === "species" && (
           <div className="form-group">
-            <label className="form-label">Species name</label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+              <label className="form-label" style={{ margin: 0 }}>Species name</label>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={onRefreshTags}
+                disabled={tagsLoading}
+                style={{ fontSize: "0.7rem", padding: "0.2rem 0.5rem" }}
+              >
+                {tagsLoading ? <Spinner /> : "🔄 Refresh Tags"}
+              </button>
+            </div>
             <input
               className="form-input"
               placeholder="e.g. dingo, cassowary, koala"
+              list="available-tags"
               value={species}
               onChange={(e) => setSpecies(e.target.value)}
             />
           </div>
         )}
+
+        <datalist id="available-tags">
+          {(availableTags || []).map(tag => (
+            <option key={tag} value={tag} />
+          ))}
+        </datalist>
 
         {activeQueryTab === "thumbnail" && (
           <div className="form-group">

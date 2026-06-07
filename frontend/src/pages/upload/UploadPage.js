@@ -53,8 +53,7 @@ export default function UploadPage({ token }) {
           Upload <span>Wildlife Media</span>
         </h1>
         <p>
-          Images and videos are automatically tagged using our ML species
-          detection model
+          Securely upload your wildlife observations to our cloud storage
         </p>
       </div>
       <div className="card">
@@ -117,7 +116,7 @@ export default function UploadPage({ token }) {
                     <Spinner /> Uploading...
                   </>
                 ) : (
-                  "🚀 Upload & Tag"
+                  "🚀 Upload to S3"
                 )}
               </button>
               <button
@@ -157,23 +156,6 @@ export default function UploadPage({ token }) {
                   {result.fileUrl}
                 </a>
               </p>
-              {result.thumbnailUrl && (
-                <p
-                  style={{
-                    fontSize: "0.85rem",
-                    color: "var(--mist)",
-                    marginBottom: "0.75rem",
-                  }}
-                >
-                  Thumbnail:{" "}
-                  <a
-                    href={result.thumbnailUrl}
-                    style={{ color: "var(--sage)" }}
-                  >
-                    {result.thumbnailUrl}
-                  </a>
-                </p>
-              )}
               <div>
                 <span
                   style={{
@@ -182,12 +164,12 @@ export default function UploadPage({ token }) {
                     marginRight: "0.5rem",
                   }}
                 >
-                  Detected species:
+                  S3 Key:
                 </span>
                 <div className="tags-row">
-                  {result.tags.map((t) => (
-                    <Tag key={t} label={t} />
-                  ))}
+                  <span style={{ fontSize: "0.85rem", color: "var(--sage)" }}>
+                    {result.s3Key}
+                  </span>
                 </div>
               </div>
             </div>

@@ -229,6 +229,11 @@ export async function deleteFiles(
   );
 }
 
+export async function getAvailableTags(token) {
+  const data = await authorizedFetch("/", { method: "GET" }, token);
+  return data.species || [];
+}
+
 export async function subscribeNotification(
   email,
   tag,
