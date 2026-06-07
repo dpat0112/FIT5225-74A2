@@ -7,42 +7,65 @@ import {
 } from "../../repository/mediaApi";
 import { Alert, Spinner, Tag } from "../../components/ui";
 
-export default function QueryPage({ token }) {
-  const [activeQuery, setActiveQuery] = useState("tags");
-  const [results, setResults] = useState([]);
+export default function QueryPage({
+  token,
+  activeQueryTab,
+  setActiveQueryTab,
+  resultsByTab,
+  setResultsByTab,
+  errorsByTab,
+  setErrorsByTab,
+  tagRows,
+  setTagRows,
+  species,
+  setSpecies,
+  thumbUrl,
+  setThumbUrl,
+  queryFile,
+  setQueryFile,
+  detectedTags,
+  setDetectedTags,
+}) {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [modal, setModal] = useState(null);
-
-  const [tagRows, setTagRows] = useState([{ tag: "", count: 1 }]);
-  const [species, setSpecies] = useState("");
-  const [thumbUrl, setThumbUrl] = useState("");
-  const [queryFile, setQueryFile] = useState(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [copyStatus, setCopyStatus] = useState(null); // URL of the item currently copied
   const fileRef = useRef();
+
+  function copyToClipboard(url, e) {
+    if (e) e.stopPropagation();
+    navigator.clipboard.writeText(url).then(() => {
+      setCopyStatus(url);
+      setTimeout(() => setCopyStatus(null), 1500);
+    });
+  }
 
   async function runQuery() {
     setLoading(true);
-    setError("");
-    setResults([]);
+    setErrorsByTab((prev) => ({ ...prev, [activeQueryTab]: "" }));
+    if (activeQueryTab !== "file") setDetectedTags(null);
     try {
       let res;
-      if (activeQuery === "tags") {
+      if (activeQueryTab === "tags") {
         const obj = {};
         tagRows.forEach((r) => {
-          if (r.tag) obj[r.tag] = parseInt(r.count) || 1;
+          const tag = (r.tag || "").trim();
+          if (tag) obj[tag] = parseInt(r.count) || 1;
         });
         res = await queryByTags(obj, token);
-      } else if (activeQuery === "species") {
-        res = await queryBySpecies(species, token);
-      } else if (activeQuery === "thumbnail") {
+      } else if (activeQueryTab === "species") {
+        res = await queryBySpecies(species.trim(), token);
+      } else if (activeQueryTab === "thumbnail") {
         res = await queryByThumbnailUrl(thumbUrl, token);
         res = [res];
-      } else if (activeQuery === "file") {
-        res = await queryByFile(queryFile, token);
+      } else if (activeQueryTab === "file") {
+        const fileRes = await queryByFile(queryFile, token);
+        res = fileRes.results;
+        setDetectedTags(fileRes.detectedTags);
       }
-      setResults(res || []);
+      setResultsByTab((prev) => ({ ...prev, [activeQueryTab]: res || [] }));
     } catch (err) {
-      setError(err.message);
+      setErrorsByTab((prev) => ({ ...prev, [activeQueryTab]: err.message }));
     } finally {
       setLoading(false);
     }
@@ -54,6 +77,9 @@ export default function QueryPage({ token }) {
     { id: "thumbnail", label: "🖼 By Thumbnail URL" },
     { id: "file", label: "📎 By File Content" },
   ];
+
+  const currentResults = resultsByTab[activeQueryTab] || [];
+  const currentError = errorsByTab[activeQueryTab] || "";
 
   return (
     <div>
@@ -78,19 +104,15 @@ export default function QueryPage({ token }) {
           {queryTypes.map((q) => (
             <button
               key={q.id}
-              className={`btn ${activeQuery === q.id ? "btn-primary" : "btn-secondary"} btn-sm`}
-              onClick={() => {
-                setActiveQuery(q.id);
-                setResults([]);
-                setError("");
-              }}
+              className={`btn ${activeQueryTab === q.id ? "btn-primary" : "btn-secondary"} btn-sm`}
+              onClick={() => setActiveQueryTab(q.id)}
             >
               {q.label}
             </button>
           ))}
         </div>
 
-        {activeQuery === "tags" && (
+        {activeQueryTab === "tags" && (
           <div>
             <div className="card-title">Search by tags with minimum counts</div>
             {tagRows.map((row, i) => (
@@ -143,7 +165,7 @@ export default function QueryPage({ token }) {
           </div>
         )}
 
-        {activeQuery === "species" && (
+        {activeQueryTab === "species" && (
           <div className="form-group">
             <label className="form-label">Species name</label>
             <input
@@ -155,19 +177,19 @@ export default function QueryPage({ token }) {
           </div>
         )}
 
-        {activeQuery === "thumbnail" && (
+        {activeQueryTab === "thumbnail" && (
           <div className="form-group">
-            <label className="form-label">File ID (Checksum)</label>
+            <label className="form-label">Thumbnail URL</label>
             <input
               className="form-input"
-              placeholder="e.g. ea11640e3f30dd687faf310e6c96e236"
+              placeholder="Paste thumbnail URL or ID..."
               value={thumbUrl}
               onChange={(e) => setThumbUrl(e.target.value)}
             />
           </div>
         )}
 
-        {activeQuery === "file" && (
+        {activeQueryTab === "file" && (
           <div>
             <div
               className="dropzone"
@@ -220,13 +242,13 @@ export default function QueryPage({ token }) {
         </div>
       </div>
 
-      {error && (
+      {currentError && (
         <div style={{ marginTop: "1rem" }}>
-          <Alert type="error">{error}</Alert>
+          <Alert type="error">{currentError}</Alert>
         </div>
       )}
 
-      {results.length > 0 && (
+      {currentResults.length > 0 && (
         <div className="card" style={{ marginTop: "1.5rem" }}>
           <div className="card-title">
             🗂 Results{" "}
@@ -237,12 +259,40 @@ export default function QueryPage({ token }) {
                 fontFamily: "DM Sans",
               }}
             >
-              ({results.length} found)
+              ({currentResults.length} found)
             </span>
           </div>
+          {activeQueryTab === "file" && detectedTags && Object.keys(detectedTags).length > 0 && (
+            <div style={{ marginBottom: "1.5rem", padding: "1rem", background: "rgba(122,171,110,0.1)", borderRadius: "10px" }}>
+              <div style={{ fontSize: "0.85rem", color: "var(--sage)", fontWeight: "600", marginBottom: "0.5rem" }}>
+                🔍 Detected in your file:
+              </div>
+              <div className="tags-row">
+                {Object.entries(detectedTags).map(([tag, count]) => (
+                  <Tag key={tag} label={`${tag} (${count})`} />
+                ))}
+              </div>
+            </div>
+          )}
           <div className="results-grid">
-            {results.map((r, i) => (
-              <div key={i} className="result-card" onClick={() => setModal(r)}>
+            {currentResults.map((r, i) => (
+              <div
+                key={i}
+                className="result-card"
+                onClick={() => {
+                  setModal(r);
+                  setModalLoading(true);
+                }}
+              >
+                <button
+                  className="copy-btn"
+                  onClick={(e) =>
+                    copyToClipboard(r.thumbnailUrl || r.fileUrl, e)
+                  }
+                  title="Copy Thumbnail URL"
+                >
+                  {copyStatus === (r.thumbnailUrl || r.fileUrl) ? "✅" : "📋"}
+                </button>
                 {r.thumbnailUrl ? (
                   <img
                     src={r.thumbnailUrl}
@@ -276,7 +326,7 @@ export default function QueryPage({ token }) {
         </div>
       )}
 
-      {results.length === 0 && !loading && !error && (
+      {currentResults.length === 0 && !loading && !currentError && (
         <div className="empty-state">
           <div className="icon">🔭</div>
           <p>Run a query to see results</p>
@@ -289,30 +339,64 @@ export default function QueryPage({ token }) {
             <button className="modal-close" onClick={() => setModal(null)}>
               ✕
             </button>
-            <div className="card-title">Full Image</div>
-            <img
-              src={modal.fileUrl}
-              alt="full size"
-              onError={(e) =>
-                (e.target.src =
-                  "https://via.placeholder.com/400x300?text=Image+Unavailable")
-              }
-            />
+            <div className="modal-header">
+              <div className="card-title" style={{ margin: 0 }}>
+                Full Image
+              </div>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => copyToClipboard(modal.fileUrl)}
+                style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+              >
+                {copyStatus === modal.fileUrl ? "✅ Copied" : "📋 Copy Full URL"}
+              </button>
+            </div>
+            <div
+              style={{
+                position: "relative",
+                minHeight: "200px",
+                marginBottom: "1rem",
+              }}
+            >
+              {modalLoading && (
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "rgba(26,46,26,0.3)",
+                    zIndex: 2,
+                    borderRadius: "10px",
+                  }}
+                >
+                  <Spinner />
+                </div>
+              )}
+              <img
+                src={modal.fileUrl}
+                alt="full size"
+                onLoad={() => setModalLoading(false)}
+                onError={(e) => {
+                  setModalLoading(false);
+                  e.target.src =
+                    "https://via.placeholder.com/400x300?text=Image+Unavailable";
+                }}
+                style={{
+                  opacity: modalLoading ? 0.3 : 1,
+                  transition: "opacity 0.3s",
+                }}
+              />
+            </div>
             <div className="tags-row">
               {(modal.tags || []).map((t) => (
                 <Tag key={t} label={t} />
               ))}
             </div>
-            <p
-              style={{
-                fontSize: "0.8rem",
-                color: "var(--mist)",
-                marginTop: "0.75rem",
-                wordBreak: "break-all",
-              }}
-            >
+            <div className="modal-url-box">
               {modal.fileUrl}
-            </p>
+            </div>
           </div>
         </div>
       )}

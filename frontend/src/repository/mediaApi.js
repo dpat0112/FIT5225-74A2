@@ -128,10 +128,12 @@ export async function queryBySpecies(species, token) {
   }));
 }
 
-export async function queryByThumbnailUrl(
-  checksum,
-  token
-) {
+export async function queryByThumbnailUrl(input, token) {
+  // Extract 32-character hex checksum from URL or use as-is if already a checksum
+  const regex = /([a-f0-9]{32})/i;
+  const match = input.match(regex);
+  const checksum = match ? match[1] : input;
+
   const data = await authorizedFetch(
     "/query/get-full-url-by-thumbnail",
     {
@@ -175,17 +177,20 @@ export async function queryByFile(file, token) {
     token
   );
 
-  return (data.results || []).map((item) => ({
+  const results = (data.results || []).map((item) => ({
     id: item.id,
     fileUrl: item.full_url,
     thumbnailUrl: item.thumbnail_url,
-    tags: Object.keys(
-      data.detected_tags || {}
-    ),
+    tags: [], // Tags for individual results aren't provided here per doc, or we could use detected_tags?
     type: item.file_type?.startsWith("video")
       ? "video"
       : "image",
   }));
+
+  return {
+    results,
+    detectedTags: data.detected_tags || {}
+  };
 }
 
 export async function modifyTags(

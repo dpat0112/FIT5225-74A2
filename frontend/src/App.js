@@ -26,6 +26,26 @@ export default function App() {
   ); // Cognito Access token
   const [activePage, setActivePage] = useState("upload");
 
+  // --- PERSISTENT SEARCH STATE ---
+  const [activeQueryTab, setActiveQueryTab] = useState("tags");
+  const [resultsByTab, setResultsByTab] = useState({
+    tags: [],
+    species: [],
+    thumbnail: [],
+    file: [],
+  });
+  const [errorsByTab, setErrorsByTab] = useState({
+    tags: "",
+    species: "",
+    thumbnail: "",
+    file: "",
+  });
+  const [tagRows, setTagRows] = useState([{ tag: "", count: 1 }]);
+  const [species, setSpecies] = useState("");
+  const [thumbUrl, setThumbUrl] = useState("");
+  const [queryFile, setQueryFile] = useState(null);
+  const [detectedTags, setDetectedTags] = useState(null);
+
   function handleLogin({ token, accessToken, user }) {
     setToken(token);
     setAccessToken(accessToken);
@@ -40,12 +60,21 @@ export default function App() {
     await logout(accessToken);
     setUser(null);
     setToken(null);
-    setAccessToken(null);
+    setAccessToken(accessToken);
     setActivePage("upload");
 
     localStorage.removeItem("ecolens_id_token");
     localStorage.removeItem("ecolens_access_token");
     localStorage.removeItem("ecolens_user");
+
+    // Optional: Clear search state on logout
+    setResultsByTab({ tags: [], species: [], thumbnail: [], file: [] });
+    setErrorsByTab({ tags: "", species: "", thumbnail: "", file: "" });
+    setTagRows([{ tag: "", count: 1 }]);
+    setSpecies("");
+    setThumbUrl("");
+    setQueryFile(null);
+    setDetectedTags(null);
   }
 
   const pages = [
@@ -105,7 +134,27 @@ export default function App() {
         </nav>
         <main className="main">
           {activePage === "upload" && <UploadPage token={token} />}
-          {activePage === "query" && <QueryPage token={token} />}
+          {activePage === "query" && (
+            <QueryPage
+              token={token}
+              activeQueryTab={activeQueryTab}
+              setActiveQueryTab={setActiveQueryTab}
+              resultsByTab={resultsByTab}
+              setResultsByTab={setResultsByTab}
+              errorsByTab={errorsByTab}
+              setErrorsByTab={setErrorsByTab}
+              tagRows={tagRows}
+              setTagRows={setTagRows}
+              species={species}
+              setSpecies={setSpecies}
+              thumbUrl={thumbUrl}
+              setThumbUrl={setThumbUrl}
+              queryFile={queryFile}
+              setQueryFile={setQueryFile}
+              detectedTags={detectedTags}
+              setDetectedTags={setDetectedTags}
+            />
+          )}
           {activePage === "tags" && <TagsPage token={token} />}
           {activePage === "delete" && <DeletePage token={token} />}
           {activePage === "notifications" && (
