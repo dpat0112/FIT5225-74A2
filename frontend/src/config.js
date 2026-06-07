@@ -7,6 +7,6 @@ export const COGNITO_CONFIG = {
 
 export const COGNITO_URL = `https://cognito-idp.${COGNITO_CONFIG.region}.amazonaws.com/`;
 
-export const API_BASE = "https://YOUR_API_GATEWAY_URL"; // TODO: replace with real API Gateway URL
+export const API_BASE = "https://rygkjf1m8i.execute-api.us-east-1.amazonaws.com/dev";
 
 export const mockDelay = (ms = 800) => new Promise((r) => setTimeout(r, ms));
