@@ -1,142 +1,148 @@
-Here is a structured Markdown documentation file for your API endpoints. You can copy and paste this directly into a `.md` file (like `README.md` or `API_DOCS.md`) in your repository.
-
----
-
-# API Documentation
+# EcoLens API Documentation
 
 **Base URL:** `https://rygkjf1m8i.execute-api.us-east-1.amazonaws.com/dev`
 
-All API endpoints expect requests to have the `Content-Type: application/json` header.
-
-## Table of Contents
-
-1. [Find by Tags](https://www.google.com/search?q=%231-find-by-tags)
-2. [Get Full URL by Thumbnail](https://www.google.com/search?q=%232-get-full-url-by-thumbnail)
-3. [Query by File](https://www.google.com/search?q=%233-query-by-file)
-4. [Update Tags (Bulk)](https://www.google.com/search?q=%234-update-tags-bulk)
-5. [Delete Files](https://www.google.com/search?q=%235-delete-files)
-
 ---
+
+## Endpoints
 
 ### 1. Find by Tags
 
-Searches the database for media files that match specific species tags. This endpoint accepts either explicit minimum counts or a simple array of species names.
+Search for images that match one or more species/subject tags.
 
-* **Method:** `POST`
-* **Endpoint:** `/query/find-by-tags`
+**`POST /query/find-by-tags`**
 
-**Request Body (Option A: Explicit Counts):**
+**Full URL:** `https://rygkjf1m8i.execute-api.us-east-1.amazonaws.com/dev/query/find-by-tags`
 
+#### Request Body
+
+Accepts either an object mapping tag names to counts, or an array of tag name strings.
+
+**Option A — Object (tag → count map):**
 ```json
 {
   "Canis_dingo": 3
 }
-
 ```
 
-**Request Body (Option B: Simple Array):**
-
+**Option B — Array of tag names:**
 ```json
-[
-  "Gymnorhina_tibicen",
-  "Homo_sapiens"
-]
-
+["Gymnorhina_tibicen", "Homo_sapiens"]
 ```
 
-**Response (200 OK):**
+#### Response
 
 ```json
 {
-    "results": [
-        {
-            "id": "b9ef5887bfc153c603b8196abd8ba013",
-            "thumbnail_url": "https://ecolens-thumbnails-74-bucket.s3.amazonaws.com/thumbnails/b9ef5887bfc153c603b8196abd8ba013.jpg?AWSAccessKeyId=...&Signature=...&Expires=1780833816",
-            "full_url": "https://ecolens-team74-bucket.s3.amazonaws.com/uploads/b9ef5887bfc153c603b8196abd8ba013.jpg?AWSAccessKeyId=...&Signature=...&Expires=1780833816",
-            "file_type": "image/jpeg"
-        }
-    ]
+  "results": [
+    {
+      "id": "b9ef5887bfc153c603b8196abd8ba013",
+      "thumbnail_url": "<presigned S3 URL>",
+      "full_url": "<presigned S3 URL>",
+      "file_type": "image/jpeg"
+    }
+  ]
 }
-
 ```
+
+| Field           | Type   | Description                                    |
+| --------------- | ------ | ---------------------------------------------- |
+| `id`            | string | MD5 checksum / unique identifier of the image  |
+| `thumbnail_url` | string | Presigned S3 URL for the thumbnail version     |
+| `full_url`      | string | Presigned S3 URL for the full-resolution image |
+| `file_type`     | string | MIME type of the image (e.g. `image/jpeg`)     |
 
 ---
 
 ### 2. Get Full URL by Thumbnail
 
-Fetches a secure, Pre-Signed URL for a high-resolution image using the file's unique checksum identifier.
+Retrieve the full-resolution presigned S3 URL for an image using its checksum.
 
-* **Method:** `POST`
-* **Endpoint:** `/query/get-full-url-by-thumbnail`
+**`POST /query/get-full-url-by-thumbnail`**
 
-**Request Body:**
+**Full URL:** `https://rygkjf1m8i.execute-api.us-east-1.amazonaws.com/dev/query/get-full-url-by-thumbnail`
+
+#### Request Body
 
 ```json
 {
   "checksum": "ea11640e3f30dd687faf310e6c96e236"
 }
-
 ```
 
-**Response (200 OK):**
+| Field      | Type   | Description             |
+| ---------- | ------ | ----------------------- |
+| `checksum` | string | MD5 checksum / image ID |
+
+#### Response
 
 ```json
 {
-    "full_url": "https://ecolens-team74-bucket.s3.amazonaws.com/uploads/ea11640e3f30dd687faf310e6c96e236.jpg?AWSAccessKeyId=...&Signature=...&Expires=1780840529"
+  "full_url": "<presigned S3 URL>"
 }
-
 ```
+
+| Field      | Type   | Description                                    |
+| ---------- | ------ | ---------------------------------------------- |
+| `full_url` | string | Presigned S3 URL for the full-resolution image |
 
 ---
 
 ### 3. Query by File
 
-Accepts a Base64 encoded image, passes it to the ML service to detect species, and returns both the detected tags and matching files from the database that contain those same species.
+Submit an image file (as base64) to detect species/subject tags and retrieve similar images from the database.
 
-* **Method:** `POST`
-* **Endpoint:** `/query/query-by-file`
+**`POST /query/query-by-file`**
 
-**Request Body:**
+**Full URL:** `https://rygkjf1m8i.execute-api.us-east-1.amazonaws.com/dev/query/query-by-file`
 
-```json
-{
-  "file_data": "BASE64 OF image"
-}
-
-```
-
-**Response (200 OK):**
+#### Request Body
 
 ```json
 {
-    "detected_tags": {
-        "Gymnorhina_tibicen": 1,
-        "Homo_sapiens": 1
-    },
-    "results": [
-        {
-            "id": "ea11640e3f30dd687faf310e6c96e236",
-            "thumbnail_url": "https://ecolens-thumbnails-74-bucket.s3.amazonaws.com/thumbnails/ea11640e3f30dd687faf310e6c96e236.jpg?AWSAccessKeyId=...&Signature=...&Expires=1780842448",
-            "full_url": "https://ecolens-team74-bucket.s3.amazonaws.com/uploads/ea11640e3f30dd687faf310e6c96e236.jpg?AWSAccessKeyId=...&Signature=...&Expires=1780842448",
-            "file_type": "image/jpeg"
-        }
-    ]
+  "file_data": "<base64-encoded image>"
 }
-
 ```
+
+| Field       | Type   | Description               |
+| ----------- | ------ | ------------------------- |
+| `file_data` | string | Base64-encoded image data |
+
+#### Response
+
+```json
+{
+  "detected_tags": {
+    "Gymnorhina_tibicen": 1,
+    "Homo_sapiens": 1
+  },
+  "results": [
+    {
+      "id": "ea11640e3f30dd687faf310e6c96e236",
+      "thumbnail_url": "<presigned S3 URL>",
+      "full_url": "<presigned S3 URL>",
+      "file_type": "image/jpeg"
+    }
+  ]
+}
+```
+
+| Field           | Type   | Description                                                        |
+| --------------- | ------ | ------------------------------------------------------------------ |
+| `detected_tags` | object | Map of detected tag names to their counts in the submitted image   |
+| `results`       | array  | Matching images from the database (same structure as Find by Tags) |
 
 ---
 
-### 4. Update Tags (Bulk)
+### 4. Update Tags
 
-Allows end-users to manually add or remove tags from multiple files simultaneously using their URLs.
+Add or modify tags on one or more existing images.
 
-* `operation: 1` = Add tags
-* `operation: 0` = Remove tags
-* **Method:** `PATCH`
-* **Endpoint:** `/query/update-tags`
+**`PATCH /query/update-tags`**
 
-**Request Body:**
+**Full URL:** `https://rygkjf1m8i.execute-api.us-east-1.amazonaws.com/dev/query/update-tags`
+
+#### Request Body
 
 ```json
 {
@@ -147,50 +153,52 @@ Allows end-users to manually add or remove tags from multiple files simultaneous
   "tags": ["peacock", "Homo_sapiens"],
   "operation": 1
 }
-
 ```
 
-**Response (200 OK):**
+| Field       | Type             | Description                                     |
+| ----------- | ---------------- | ----------------------------------------------- |
+| `urls`      | array of strings | S3 URLs of the images to update                 |
+| `tags`      | array of strings | Tags to apply                                   |
+| `operation` | integer          | Tag operation to perform (e.g. `1` = add/merge) |
+
+#### Response
 
 ```json
 {
-    "message": "Successfully updated tags for 2 files.",
-    "updated": [
-        {
-            "id": "ea11640e3f30dd687faf310e6c96e236",
-            "url": "https://ecolens-team74-bucket.s3.amazonaws.com/uploads/ea11640e3f30dd687faf310e6c96e236.jpg",
-            "new_tags": {
-                "Gymnorhina_tibicen": 1,
-                "Human": 1,
-                "peacock": 1,
-                "Homo_sapiens": 1
-            }
-        },
-        {
-            "id": "f026d4316f33abe83726e12b4c70f763",
-            "url": "https://ecolens-team74-bucket.s3.amazonaws.com/uploads/f026d4316f33abe83726e12b4c70f763.jpg",
-            "new_tags": {
-                "Uromys_caudimaculatus": 1,
-                "peacock": 1,
-                "Homo_sapiens": 1
-            }
-        }
-    ],
-    "errors": []
+  "message": "Successfully updated tags for 2 files.",
+  "updated": [
+    {
+      "id": "ea11640e3f30dd687faf310e6c96e236",
+      "url": "https://ecolens-team74-bucket.s3.amazonaws.com/uploads/ea11640e3f30dd687faf310e6c96e236.jpg",
+      "new_tags": {
+        "Gymnorhina_tibicen": 1,
+        "Human": 1,
+        "peacock": 1,
+        "Homo_sapiens": 1
+      }
+    }
+  ],
+  "errors": []
 }
-
 ```
+
+| Field     | Type   | Description                                                           |
+| --------- | ------ | --------------------------------------------------------------------- |
+| `message` | string | Human-readable summary of the operation                               |
+| `updated` | array  | Each updated image with its `id`, `url`, and resulting `new_tags` map |
+| `errors`  | array  | Any errors encountered during the operation                           |
 
 ---
 
 ### 5. Delete Files
 
-Completely removes specified media files and their thumbnails from S3 storage, and clears their associated metadata records from the Firestore database.
+Permanently delete one or more images from the system.
 
-* **Method:** `DELETE`
-* **Endpoint:** `/` *(Note: Target is the base execution path)*
+**`DELETE /`**
 
-**Request Body:**
+**Full URL:** `https://rygkjf1m8i.execute-api.us-east-1.amazonaws.com/dev/`
+
+#### Request Body
 
 ```json
 {
@@ -200,29 +208,37 @@ Completely removes specified media files and their thumbnails from S3 storage, a
     "https://ecolens-team74-bucket.s3.amazonaws.com/uploads/724716bfba1220959e751e097d7f7894.jpg"
   ]
 }
-
 ```
 
-**Response (200 OK):**
+| Field  | Type             | Description                     |
+| ------ | ---------------- | ------------------------------- |
+| `urls` | array of strings | S3 URLs of the images to delete |
+
+#### Response
 
 ```json
 {
-    "message": "Successfully deleted 3 files.",
-    "deleted": [
-        {
-            "id": "38c94a690b045ae950b79a050393d678",
-            "url": "https://ecolens-team74-bucket.s3.amazonaws.com/uploads/38c94a690b045ae950b79a050393d678.jpg"
-        },
-        {
-            "id": "5684653b49f29240c94cbf3e6348993b",
-            "url": "https://ecolens-team74-bucket.s3.amazonaws.com/uploads/5684653b49f29240c94cbf3e6348993b.jpg"
-        },
-        {
-            "id": "724716bfba1220959e751e097d7f7894",
-            "url": "https://ecolens-team74-bucket.s3.amazonaws.com/uploads/724716bfba1220959e751e097d7f7894.jpg"
-        }
-    ],
-    "errors": []
+  "message": "Successfully deleted 3 files.",
+  "deleted": [
+    {
+      "id": "38c94a690b045ae950b79a050393d678",
+      "url": "https://ecolens-team74-bucket.s3.amazonaws.com/uploads/38c94a690b045ae950b79a050393d678.jpg"
+    }
+  ],
+  "errors": []
 }
-
 ```
+
+| Field     | Type   | Description                                 |
+| --------- | ------ | ------------------------------------------- |
+| `message` | string | Human-readable summary of the operation     |
+| `deleted` | array  | Each deleted image with its `id` and `url`  |
+| `errors`  | array  | Any errors encountered during the operation |
+
+---
+
+## Notes
+
+- **Presigned URLs** returned by the API are temporary and will expire. Do not store or cache them long-term.
+- **Image IDs** are MD5 checksums of the original file and are used consistently across all endpoints.
+- **Tags** follow binomial nomenclature (e.g. `Homo_sapiens`, `Gymnorhina_tibicen`) but arbitrary strings like `"peacock"` are also accepted.
