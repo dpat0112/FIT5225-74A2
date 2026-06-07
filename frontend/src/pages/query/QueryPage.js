@@ -157,10 +157,10 @@ export default function QueryPage({ token }) {
 
         {activeQuery === "thumbnail" && (
           <div className="form-group">
-            <label className="form-label">Thumbnail URL</label>
+            <label className="form-label">File ID (Checksum)</label>
             <input
               className="form-input"
-              placeholder="https://s3.amazonaws.com/..."
+              placeholder="e.g. ea11640e3f30dd687faf310e6c96e236"
               value={thumbUrl}
               onChange={(e) => setThumbUrl(e.target.value)}
             />

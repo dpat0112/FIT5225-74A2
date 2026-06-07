@@ -22,7 +22,7 @@ export default function DeletePage({ token }) {
     setMsg(null);
     try {
       const res = await deleteFiles(urlList, token);
-      setMsg(res.message);
+      setMsg(res.message || "Files deleted successfully.");
       setUrls("");
     } catch (err) {
       setError(err.message);

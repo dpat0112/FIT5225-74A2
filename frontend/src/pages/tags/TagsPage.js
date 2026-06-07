@@ -28,7 +28,9 @@ export default function TagsPage({ token }) {
     setMsg(null);
     try {
       const res = await modifyTags(urlList, tagList, operation, token);
-      setMsg(res.message);
+      setMsg(res.message || "Tags updated successfully.");
+      setUrls("");
+      setTags("");
     } catch (err) {
       setError(err.message);
     } finally {
