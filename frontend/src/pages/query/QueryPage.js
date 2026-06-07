@@ -309,39 +309,35 @@ export default function QueryPage({
             {currentResults.map((r, i) => (
               <div
                 key={i}
-                className="result-card"
+                className={`result-card ${r.type === "video" ? "not-clickable" : ""}`}
                 onClick={() => {
-                  setModal(r);
-                  setModalLoading(true);
+                  if (r.type !== "video") {
+                    setModal(r);
+                    setModalLoading(true);
+                  }
                 }}
               >
                 <button
                   className="copy-btn"
                   onClick={(e) =>
-                    copyToClipboard(r.thumbnailUrl || r.fileUrl, e)
+                    copyToClipboard(r.type === "video" ? r.fileUrl : (r.thumbnailUrl || r.fileUrl), e)
                   }
-                  title="Copy Thumbnail URL"
+                  title={r.type === "video" ? "Copy Video URL" : "Copy Thumbnail URL"}
                 >
-                  {copyStatus === (r.thumbnailUrl || r.fileUrl) ? "✅" : "📋"}
+                  {copyStatus === (r.type === "video" ? r.fileUrl : (r.thumbnailUrl || r.fileUrl)) ? "✅" : "📋"}
                 </button>
-                {r.thumbnailUrl ? (
-                  <img
-                    src={r.thumbnailUrl}
-                    alt="result"
-                    onError={(e) => (e.target.style.display = "none")}
-                  />
+                {r.type === "video" ? (
+                  <div className="video-placeholder">🎬</div>
                 ) : (
-                  <div
-                    style={{
-                      height: "110px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "2rem",
-                    }}
-                  >
-                    🎬
-                  </div>
+                  r.thumbnailUrl ? (
+                    <img
+                      src={r.thumbnailUrl}
+                      alt="result"
+                      onError={(e) => (e.target.style.display = "none")}
+                    />
+                  ) : (
+                    <div className="video-placeholder">🖼</div>
+                  )
                 )}
                 <div className="result-card-info">
                   <div className="result-card-type">{r.type || "image"}</div>

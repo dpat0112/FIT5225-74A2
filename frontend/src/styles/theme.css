@@ -192,7 +192,10 @@ body {
   position: relative;
 }
 .result-card:hover { transform: translateY(-3px); border-color: var(--sage); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+.result-card.not-clickable { cursor: default; }
+.result-card.not-clickable:hover { transform: none; border-color: rgba(122,171,110,0.15); box-shadow: none; }
 .result-card img { width: 100%; height: 110px; object-fit: cover; display: block; }
+.video-placeholder { height: 110px; display: flex; align-items: center; justify-content: center; fontSize: 2rem; background: rgba(0,0,0,0.2); }
 .result-card-info { padding: 0.6rem; }
 .result-card-type { font-size: 0.7rem; color: var(--amber); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
 

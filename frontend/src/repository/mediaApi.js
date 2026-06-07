@@ -32,31 +32,17 @@ export async function uploadFile(file, token) {
   try {
     const checksum = await calculateFileMD5(file);
 
-    const checkUrl =
-      "https://rygkjf1m8i.execute-api.us-east-1.amazonaws.com/dev/file-upload/check-duplicate";
-
-    const checkRes = await fetch(checkUrl, {
+    // 1. Check for duplicates and get pre-signed URL
+    const data = await authorizedFetch("/file-upload/check-duplicate", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
       body: JSON.stringify({
         checksum,
         fileName: file.name,
+        fileType: file.type,
       }),
-    });
+    }, token);
 
-    const data = await checkRes.json();
-
-    if (!checkRes.ok) {
-      throw new Error(
-        data.error ||
-          data.message ||
-          "Duplicate file detected."
-      );
-    }
-
+    // 2. Upload to S3 using the pre-signed URL (No Bearer token for S3 itself)
     const uploadRes = await fetch(data.uploadUrl, {
       method: "PUT",
       headers: {
