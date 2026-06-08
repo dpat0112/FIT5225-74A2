@@ -2,7 +2,7 @@ import { useState } from "react";
 import { modifyTags } from "../../repository/mediaApi";
 import { Alert, Spinner } from "../../components/ui";
 
-export default function TagsPage({ token }) {
+export default function TagsPage({ token, onAuthError }) {
   const [urls, setUrls] = useState("");
   const [tags, setTags] = useState("");
   const [operation, setOperation] = useState(1);
@@ -32,6 +32,10 @@ export default function TagsPage({ token }) {
       setUrls("");
       setTags("");
     } catch (err) {
+      if (err.isAuthError) {
+        onAuthError();
+        return;
+      }
       setError(err.message);
     } finally {
       setLoading(false);

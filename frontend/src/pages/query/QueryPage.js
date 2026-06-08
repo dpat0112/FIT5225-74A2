@@ -28,6 +28,7 @@ export default function QueryPage({
   availableTags,
   tagsLoading,
   onRefreshTags,
+  onAuthError,
 }) {
   const [loading, setLoading] = useState(false);
   const [modal, setModal] = useState(null);
@@ -68,6 +69,10 @@ export default function QueryPage({
       }
       setResultsByTab((prev) => ({ ...prev, [activeQueryTab]: res || [] }));
     } catch (err) {
+      if (err.isAuthError) {
+        onAuthError();
+        return;
+      }
       setErrorsByTab((prev) => ({ ...prev, [activeQueryTab]: err.message }));
     } finally {
       setLoading(false);

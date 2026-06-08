@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { uploadFile } from "../../repository/mediaApi";
 import { Alert, Spinner, Tag } from "../../components/ui";
 
-export default function UploadPage({ token }) {
+export default function UploadPage({ token, onAuthError }) {
   const [file, setFile] = useState(null);
   const [drag, setDrag] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -39,6 +39,10 @@ export default function UploadPage({ token }) {
       setProgress(100);
       setResult(res);
     } catch (err) {
+      if (err.isAuthError) {
+        onAuthError();
+        return;
+      }
       setError(err.message);
     } finally {
       clearInterval(interval);

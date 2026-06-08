@@ -9,7 +9,8 @@ import TagsPage from "./pages/tags/TagsPage";
 import DeletePage from "./pages/tags/DeletePage";
 import NotificationsPage from "./pages/tags/NotificationsPage";
 import { useEffect, useCallback } from "react";
-import { getAvailableTags } from "./repository/mediaApi";
+import { getAvailableTags, validateToken } from "./repository/mediaApi";
+import { Alert } from "./components/ui";
 
 // ============================================================
 // MAIN APP
@@ -27,6 +28,10 @@ export default function App() {
     localStorage.getItem("ecolens_access_token")
   ); // Cognito Access token
   const [activePage, setActivePage] = useState("upload");
+  const [authError, setAuthError] = useState(() => {
+    // Check if we were just redirected due to expiry in a previous reload
+    return sessionStorage.getItem("ecolens_auth_error");
+  });
 
   // --- PERSISTENT SEARCH STATE ---
   const [activeQueryTab, setActiveQueryTab] = useState("tags");
@@ -64,31 +69,77 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Immediate local check for tokens
+    const savedIdToken = localStorage.getItem("ecolens_id_token");
+    const savedAccessToken = localStorage.getItem("ecolens_access_token");
+
+    if (user && (!savedIdToken || !savedAccessToken)) {
+      handleLogout(true);
+      return;
+    }
+
     if (token) {
+      // Validate token on startup/refresh
+      validateToken(token).catch((err) => {
+        console.log("Validation error detected:", err);
+        if (err.isAuthError) {
+          handleLogout(true);
+        }
+      });
       loadTags(token);
     }
-  }, [token, loadTags]);
+
+    // Listen for storage changes in other tabs
+    const handleStorageChange = (e) => {
+      if (e.key === "ecolens_id_token" && !e.newValue) {
+        handleLogout(true);
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [token, user, loadTags]);
 
   function handleLogin({ token, accessToken, user }) {
     setToken(token);
     setAccessToken(accessToken);
     setUser(user);
+    setAuthError(null);
+    sessionStorage.removeItem("ecolens_auth_error");
 
     localStorage.setItem("ecolens_id_token", token);
     localStorage.setItem("ecolens_access_token", accessToken);
     localStorage.setItem("ecolens_user", JSON.stringify(user));
   }
 
-  async function handleLogout() {
-    await logout(accessToken);
+  async function handleLogout(withError = false) {
+    // Optimistic UI clear
     setUser(null);
     setToken(null);
-    setAccessToken(accessToken);
+    setAccessToken(null);
     setActivePage("upload");
 
     localStorage.removeItem("ecolens_id_token");
     localStorage.removeItem("ecolens_access_token");
     localStorage.removeItem("ecolens_user");
+
+    if (withError) {
+      sessionStorage.setItem(
+        "ecolens_auth_error",
+        "Your session has expired. Please log in again."
+      );
+      setAuthError("Your session has expired. Please log in again.");
+    } else {
+      sessionStorage.removeItem("ecolens_auth_error");
+      setAuthError(null);
+    }
+
+    try {
+      if (accessToken) {
+        await logout(accessToken);
+      }
+    } catch (e) {
+      console.error("Logout API call failed:", e);
+    }
 
     // Optional: Clear search state on logout
     setResultsByTab({ tags: [], species: [], thumbnail: [], file: [] });
@@ -114,6 +165,21 @@ export default function App() {
       <>
         <div className="bg-pattern" />
         <div className="app">
+          {authError && (
+            <div
+              style={{
+                position: "fixed",
+                top: "2rem",
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 1000,
+                width: "90%",
+                maxWidth: "400px",
+              }}
+            >
+              <Alert type="error">{authError}</Alert>
+            </div>
+          )}
           {authView === "login" ? (
             <LoginPage
               onLogin={handleLogin}
@@ -150,13 +216,21 @@ export default function App() {
             <span>
               {user.firstName} {user.lastName}
             </span>
-            <button className="btn-logout" onClick={handleLogout}>
+            <button
+              className="btn-logout"
+              onClick={() => handleLogout(false)}
+            >
               Sign Out
             </button>
           </div>
         </nav>
         <main className="main">
-          {activePage === "upload" && <UploadPage token={token} />}
+          {activePage === "upload" && (
+            <UploadPage
+              token={token}
+              onAuthError={() => handleLogout(true)}
+            />
+          )}
           {activePage === "query" && (
             <QueryPage
               token={token}
@@ -179,10 +253,21 @@ export default function App() {
               availableTags={availableTags}
               tagsLoading={tagsLoading}
               onRefreshTags={() => loadTags(token)}
+              onAuthError={() => handleLogout(true)}
             />
           )}
-          {activePage === "tags" && <TagsPage token={token} />}
-          {activePage === "delete" && <DeletePage token={token} />}
+          {activePage === "tags" && (
+            <TagsPage
+              token={token}
+              onAuthError={() => handleLogout(true)}
+            />
+          )}
+          {activePage === "delete" && (
+            <DeletePage
+              token={token}
+              onAuthError={() => handleLogout(true)}
+            />
+          )}
           {activePage === "notifications" && (
             <NotificationsPage token={token} user={user} />
           )}

@@ -3,29 +3,57 @@ import { calculateFileMD5 } from "../utils/md5";
 
 // Helper: standardized fetch with Auth header
 async function authorizedFetch(endpoint, options = {}, token) {
+  // 1. Strict Existence Check
+  const idToken = localStorage.getItem("ecolens_id_token");
+  const accessToken = localStorage.getItem("ecolens_access_token");
+
+  if (!token || !idToken || !accessToken) {
+    const error = new Error("No active session. Please log in.");
+    error.isAuthError = true;
+    throw error;
+  }
+
   const url = `${API_BASE}${endpoint}`;
   const headers = {
     "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    Authorization: `Bearer ${token}`,
     ...options.headers,
   };
 
-  const res = await fetch(url, {
-    ...options,
-    headers,
-  });
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers,
+    });
 
-  const data = await res.json();
+    const data = await res.json();
 
-  if (!res.ok) {
-    throw new Error(
-      data.error ||
-        data.message ||
-        "API request failed"
-    );
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        const error = new Error("Token expired");
+        error.isAuthError = true;
+        throw error;
+      }
+      throw new Error(
+        data.error ||
+          data.message ||
+          "API request failed"
+      );
+    }
+
+    return data;
+  } catch (e) {
+    // 2. Network Error Handling
+    if (e.message === "Failed to fetch" || e.name === "TypeError") {
+      e.isAuthError = true; // Treat as session risk during validation
+    }
+    throw e;
   }
+}
 
-  return data;
+export async function validateToken(token) {
+  // GET / is fastest to check token validity
+  return await authorizedFetch("/", { method: "GET" }, token);
 }
 
 export async function uploadFile(file, token) {

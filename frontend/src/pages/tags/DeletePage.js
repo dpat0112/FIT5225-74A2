@@ -2,7 +2,7 @@ import { useState } from "react";
 import { deleteFiles } from "../../repository/mediaApi";
 import { Alert, Spinner } from "../../components/ui";
 
-export default function DeletePage({ token }) {
+export default function DeletePage({ token, onAuthError }) {
   const [urls, setUrls] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -25,6 +25,10 @@ export default function DeletePage({ token }) {
       setMsg(res.message || "Files deleted successfully.");
       setUrls("");
     } catch (err) {
+      if (err.isAuthError) {
+        onAuthError();
+        return;
+      }
       setError(err.message);
     } finally {
       setLoading(false);
