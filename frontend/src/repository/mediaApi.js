@@ -179,3 +179,103 @@ export async function queryByFile(file, token) {
       reader.readAsDataURL(file);
     }
   );
+  const data = await authorizedFetch(
+    "/query/query-by-file",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        file_data: base64,
+      }),
+    },
+    token
+  );
+
+  const results = (data.results || []).map((item) => ({
+    id: item.id,
+    fileUrl: item.full_url,
+    thumbnailUrl: item.thumbnail_url,
+    tags: [], // Tags for individual results aren't provided here per doc, or we could use detected_tags?
+    type: item.file_type?.startsWith("video")
+      ? "video"
+      : "image",
+  }));
+
+  return {
+    results,
+    detectedTags: data.detected_tags || {}
+  };
+}
+
+export async function modifyTags(
+  urls,
+  tags,
+  operation,
+  token
+) {
+  return await authorizedFetch(
+    "/query/update-tags",
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        urls,
+        tags,
+        operation,
+      }),
+    },
+    token
+  );
+}
+
+export async function deleteFiles(
+  urls,
+  token
+) {
+  return await authorizedFetch(
+    "",
+    {
+      method: "DELETE",
+      body: JSON.stringify({
+        urls,
+      }),
+    },
+    token
+  );
+}
+
+export async function getAvailableTags(token) {
+  const data = await authorizedFetch("/", { method: "GET" }, token);
+  return data.species || [];
+}
+
+export async function subscribeNotification(
+  email,
+  speciesTags,
+  token
+) {
+  const url = "https://ecolens-ml-service-567231773270.australia-southeast2.run.app/subscribe";
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      mode: "cors", // Explicitly set CORS mode
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email: email,
+        species_tags: speciesTags,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || `Subscription failed with status: ${res.status}`);
+    }
+    return data;
+  } catch (e) {
+    console.error("Full Subscription Error Detail:", e);
+    // Provide a more descriptive error for the user to see in the UI
+    const customError = new Error(`Connection Error: ${e.message}. Please check if the ML service URL is reachable and CORS is enabled.`);
+    customError.originalError = e;
+    throw customError;
+  }
+}
