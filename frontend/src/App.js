@@ -192,3 +192,92 @@ export default function App() {
       </>
     );
   }
+
+  return (
+    <>
+      <div className="bg-pattern" />
+      <div className="app">
+        <nav className="nav">
+          <div className="nav-brand">
+            🌿 Aussie <span>EcoLens</span>
+          </div>
+          <div className="nav-tabs">
+            {pages.map((p) => (
+              <button
+                key={p.id}
+                className={`nav-tab${activePage === p.id ? " active" : ""}`}
+                onClick={() => setActivePage(p.id)}
+              >
+                {p.icon} {p.label}
+              </button>
+            ))}
+          </div>
+          <div className="nav-user">
+            <span>
+              {user.firstName} {user.lastName}
+            </span>
+            <button
+              className="btn-logout"
+              onClick={() => handleLogout(false)}
+            >
+              Sign Out
+            </button>
+          </div>
+        </nav>
+        <main className="main">
+          {activePage === "upload" && (
+            <UploadPage
+              token={token}
+              onAuthError={() => handleLogout(true)}
+            />
+          )}
+          {activePage === "query" && (
+            <QueryPage
+              token={token}
+              activeQueryTab={activeQueryTab}
+              setActiveQueryTab={setActiveQueryTab}
+              resultsByTab={resultsByTab}
+              setResultsByTab={setResultsByTab}
+              errorsByTab={errorsByTab}
+              setErrorsByTab={setErrorsByTab}
+              tagRows={tagRows}
+              setTagRows={setTagRows}
+              species={species}
+              setSpecies={setSpecies}
+              thumbUrl={thumbUrl}
+              setThumbUrl={setThumbUrl}
+              queryFile={queryFile}
+              setQueryFile={setQueryFile}
+              detectedTags={detectedTags}
+              setDetectedTags={setDetectedTags}
+              availableTags={availableTags}
+              tagsLoading={tagsLoading}
+              onRefreshTags={() => loadTags(token)}
+              onAuthError={() => handleLogout(true)}
+            />
+          )}
+          {activePage === "tags" && (
+            <TagsPage
+              token={token}
+              onAuthError={() => handleLogout(true)}
+            />
+          )}
+          {activePage === "delete" && (
+            <DeletePage
+              token={token}
+              onAuthError={() => handleLogout(true)}
+            />
+          )}
+          {activePage === "notifications" && (
+            <NotificationsPage
+              token={token}
+              user={user}
+              availableTags={availableTags}
+              onAuthError={() => handleLogout(true)}
+            />
+          )}
+        </main>
+      </div>
+    </>
+  );
+}
