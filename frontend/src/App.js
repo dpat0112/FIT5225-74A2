@@ -269,7 +269,12 @@ export default function App() {
             />
           )}
           {activePage === "notifications" && (
-            <NotificationsPage token={token} user={user} />
+            <NotificationsPage
+              token={token}
+              user={user}
+              availableTags={availableTags}
+              onAuthError={() => handleLogout(true)}
+            />
           )}
         </main>
       </div>

@@ -250,12 +250,33 @@ export async function getAvailableTags(token) {
 
 export async function subscribeNotification(
   email,
-  tag,
+  speciesTags,
   token
 ) {
-  return {
-    success: true,
-    message:
-      "Notification endpoint not implemented in backend.",
-  };
+  const url = "https://ecolens-ml-service-567231773270.australia-southeast2.run.app/subscribe";
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      mode: "cors", // Explicitly set CORS mode
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email: email,
+        species_tags: speciesTags,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || `Subscription failed with status: ${res.status}`);
+    }
+    return data;
+  } catch (e) {
+    console.error("Full Subscription Error Detail:", e);
+    // Provide a more descriptive error for the user to see in the UI
+    const customError = new Error(`Connection Error: ${e.message}. Please check if the ML service URL is reachable and CORS is enabled.`);
+    customError.originalError = e;
+    throw customError;
+  }
 }
