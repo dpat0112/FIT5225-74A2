@@ -99,4 +99,96 @@ export default function App() {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, [token, user, loadTags]);
 
- 
+  function handleLogin({ token, accessToken, user }) {
+    setToken(token);
+    setAccessToken(accessToken);
+    setUser(user);
+    setAuthError(null);
+    sessionStorage.removeItem("ecolens_auth_error");
+
+    localStorage.setItem("ecolens_id_token", token);
+    localStorage.setItem("ecolens_access_token", accessToken);
+    localStorage.setItem("ecolens_user", JSON.stringify(user));
+  }
+
+  async function handleLogout(withError = false) {
+    // Optimistic UI clear
+    setUser(null);
+    setToken(null);
+    setAccessToken(null);
+    setActivePage("upload");
+
+    localStorage.removeItem("ecolens_id_token");
+    localStorage.removeItem("ecolens_access_token");
+    localStorage.removeItem("ecolens_user");
+
+    if (withError) {
+      sessionStorage.setItem(
+        "ecolens_auth_error",
+        "Your session has expired. Please log in again."
+      );
+      setAuthError("Your session has expired. Please log in again.");
+    } else {
+      sessionStorage.removeItem("ecolens_auth_error");
+      setAuthError(null);
+    }
+
+    try {
+      if (accessToken) {
+        await logout(accessToken);
+      }
+    } catch (e) {
+      console.error("Logout API call failed:", e);
+    }
+
+    // Optional: Clear search state on logout
+    setResultsByTab({ tags: [], species: [], thumbnail: [], file: [] });
+    setErrorsByTab({ tags: "", species: "", thumbnail: "", file: "" });
+    setTagRows([{ tag: "", count: 1 }]);
+    setSpecies("");
+    setThumbUrl("");
+    setQueryFile(null);
+    setDetectedTags(null);
+  }
+
+  const pages = [
+    { id: "upload", label: "Upload", icon: "📤" },
+    { id: "query", label: "Search", icon: "🔍" },
+    { id: "tags", label: "Tags", icon: "🏷" },
+    { id: "delete", label: "Delete", icon: "🗑" },
+    { id: "notifications", label: "Alerts", icon: "🔔" },
+  ];
+
+  // Not logged in
+  if (!user) {
+    return (
+      <>
+        <div className="bg-pattern" />
+        <div className="app">
+          {authError && (
+            <div
+              style={{
+                position: "fixed",
+                top: "2rem",
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 1000,
+                width: "90%",
+                maxWidth: "400px",
+              }}
+            >
+              <Alert type="error">{authError}</Alert>
+            </div>
+          )}
+          {authView === "login" ? (
+            <LoginPage
+              onLogin={handleLogin}
+              onSwitchToSignup={() => setAuthView("signup")}
+            />
+          ) : (
+            <SignupPage onSwitchToLogin={() => setAuthView("login")} />
+          )}
+        </div>
+      </>
+    );
+  }
