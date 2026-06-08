@@ -54,3 +54,36 @@ export async function signup(email, password, firstName, lastName) {
       "Account created! Please check your email to verify your account before signing in.",
   };
 }
+
+export async function logout(accessToken) {
+  if (accessToken) {
+    try {
+      await cognitoRequest("GlobalSignOut", { AccessToken: accessToken });
+    } catch (e) {
+      /* ignore */
+    }
+  }
+  return { success: true };
+}
+
+export async function confirmSignUp(email, code) {
+  await cognitoRequest("ConfirmSignUp", {
+    ClientId: COGNITO_CONFIG.clientId,
+    Username: email,
+    ConfirmationCode: code,
+  });
+  return { success: true, message: "Account verified successfully." };
+}
+
+export async function resendConfirmationCode(email) {
+  const data = await cognitoRequest("ResendConfirmationCode", {
+    ClientId: COGNITO_CONFIG.clientId,
+    Username: email,
+  });
+  return {
+    success: true,
+    message: data.CodeDeliveryDetails
+      ? `Code sent to ${data.CodeDeliveryDetails.Destination}`
+      : "Code resent.",
+  };
+}
